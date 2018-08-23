@@ -131,23 +131,21 @@ public class DefaultResolvedArtifact implements ResolvedArtifact, Buildable, Res
         // Do NOT try to inline the variables there.
         File f = file;
         if (f == null) {
-            synchronized (this) {
-                f = file;
-                if (f == null) {
-                    Throwable err = failure;
-                    if (err != null) {
-                        throw UncheckedException.throwAsUncheckedException(err);
-                    }
-                    try {
-                        f = artifactSource.create();
-                        file = f;
-                    } catch (Throwable e) {
-                        err = e;
-                        failure = err;
-                        throw UncheckedException.throwAsUncheckedException(err);
-                    } finally {
-                        artifactSource = null;
-                    }
+            f = file;
+            if (f == null) {
+                Throwable err = failure;
+                if (err != null) {
+                    throw UncheckedException.throwAsUncheckedException(err);
+                }
+                try {
+                    f = artifactSource.create();
+                    file = f;
+                } catch (Throwable e) {
+                    err = e;
+                    failure = err;
+                    throw UncheckedException.throwAsUncheckedException(err);
+                } finally {
+                    artifactSource = null;
                 }
             }
         }
