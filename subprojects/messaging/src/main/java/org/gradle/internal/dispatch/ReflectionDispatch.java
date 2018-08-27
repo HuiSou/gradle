@@ -17,11 +17,13 @@
 package org.gradle.internal.dispatch;
 
 import org.gradle.internal.UncheckedException;
+import org.gradle.internal.concurrent.CompositeStoppable;
+import org.gradle.internal.concurrent.Stoppable;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 
-public class ReflectionDispatch implements Dispatch<MethodInvocation> {
+public class ReflectionDispatch implements Dispatch<MethodInvocation>, Stoppable {
     private final Object target;
 
     public ReflectionDispatch(Object target) {
@@ -38,5 +40,10 @@ public class ReflectionDispatch implements Dispatch<MethodInvocation> {
         } catch (Throwable throwable) {
             throw UncheckedException.throwAsUncheckedException(throwable);
         }
+    }
+
+    @Override
+    public void stop() {
+        CompositeStoppable.stoppable(target).stop();
     }
 }
