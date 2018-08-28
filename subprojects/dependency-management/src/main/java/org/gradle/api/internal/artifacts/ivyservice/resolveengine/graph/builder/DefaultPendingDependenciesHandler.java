@@ -37,8 +37,8 @@ class DefaultPendingDependenciesHandler implements PendingDependenciesHandler {
 
         public boolean maybeAddAsPendingDependency(NodeState node, DependencyState dependencyState) {
             ModuleIdentifier key = dependencyState.getModuleIdentifier();
-            boolean isOptionalDependency = dependencyState.getDependency().isConstraint();
-            if (!isOptionalDependency) {
+            boolean isConstraint = dependencyState.getDependency().isConstraint();
+            if (!isConstraint) {
                 // Mark as not pending. If we saw pending dependencies before, mark them as no longer pending
                 markNotPending(key);
                 return false;
