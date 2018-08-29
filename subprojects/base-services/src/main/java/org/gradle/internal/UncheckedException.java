@@ -25,7 +25,7 @@ import java.lang.reflect.InvocationTargetException;
  * Wraps a checked exception. Carries no other context.
  */
 public final class UncheckedException extends RuntimeException {
-    public UncheckedException(Throwable cause) {
+    private UncheckedException(Throwable cause) {
         super(cause);
     }
 
