@@ -44,6 +44,9 @@ public final class UncheckedException extends RuntimeException {
      * Note: always throws the failure in some form. The return value is to keep the compiler happy.
      */
     public static RuntimeException throwAsUncheckedException(Throwable t, boolean preserveMessage) {
+        if (t instanceof InterruptedException) {
+            Thread.currentThread().interrupt();
+        }
         if (t instanceof RuntimeException) {
             throw (RuntimeException) t;
         }

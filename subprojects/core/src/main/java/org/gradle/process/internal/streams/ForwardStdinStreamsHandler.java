@@ -65,7 +65,7 @@ public class ForwardStdinStreamsHandler implements StreamsHandler {
         try {
             completed.await();
         } catch (InterruptedException e) {
-            throw new UncheckedException(e);
+            throw UncheckedException.throwAsUncheckedException(e);
         }
     }
 }

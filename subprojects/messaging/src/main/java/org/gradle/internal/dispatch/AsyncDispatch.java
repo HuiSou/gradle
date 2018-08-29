@@ -112,8 +112,7 @@ public class AsyncDispatch<T> implements Dispatch<T>, AsyncStoppable {
                     try {
                         condition.await();
                     } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        throw new UncheckedException(e);
+                        throw UncheckedException.throwAsUncheckedException(e);
                     }
                 }
                 if (!queue.isEmpty()) {
@@ -140,8 +139,7 @@ public class AsyncDispatch<T> implements Dispatch<T>, AsyncStoppable {
                 try {
                     condition.await();
                 } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    throw new UncheckedException(e);
+                    throw UncheckedException.throwAsUncheckedException(e);
                 }
             }
             if (state == State.Stopped) {
@@ -186,9 +184,8 @@ public class AsyncDispatch<T> implements Dispatch<T>, AsyncStoppable {
                     "Cannot wait for messages to be dispatched, as there are no dispatch threads running.");
             }
         } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
             executor.shutdownNow();
-            throw new UncheckedException(e);
+            throw UncheckedException.throwAsUncheckedException(e);
         } finally {
             lock.unlock();
         }

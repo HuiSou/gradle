@@ -47,7 +47,6 @@ public class EndPointQueue implements Dispatch<InterHubMessage> {
                 try {
                     condition.await();
                 } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
                     throw UncheckedException.throwAsUncheckedException(e);
                 }
             }
