@@ -54,6 +54,7 @@ public class ExecHandleRunner implements Runnable {
             aborted = true;
             if (process != null) {
                 LOGGER.debug("Abort requested. Destroying process: {}.", execHandle.getDisplayName());
+                streamsHandler.disconnect();
                 process.destroy();
             }
         } finally {

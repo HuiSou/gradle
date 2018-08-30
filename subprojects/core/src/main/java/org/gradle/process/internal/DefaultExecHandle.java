@@ -431,5 +431,11 @@ public class DefaultExecHandle implements ExecHandle, ProcessSettings {
             inputHandler.stop();
             outputHandler.stop();
         }
+
+        @Override
+        public void disconnect() {
+            inputHandler.disconnect();
+            outputHandler.disconnect();
+        }
     }
 }

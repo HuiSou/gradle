@@ -58,7 +58,7 @@ public class ExecOutputHandleRunner implements Runnable {
     private void forwardContent() {
         byte[] buffer = new byte[bufferSize];
         try {
-            while (true) {
+            while (!closed) {
                 int nread = inputStream.read(buffer);
                 if (nread < 0) {
                     break;
@@ -83,12 +83,16 @@ public class ExecOutputHandleRunner implements Runnable {
     }
 
     public void closeInput() throws IOException {
-        closed = true;
+        disconnect();
         inputStream.close();
     }
 
     @Override
     public String toString() {
         return displayName;
+    }
+
+    public void disconnect() {
+        closed = true;
     }
 }

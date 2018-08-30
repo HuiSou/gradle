@@ -70,4 +70,12 @@ public class OutputStreamsForwarder implements StreamsHandler {
             throw UncheckedException.throwAsUncheckedException(e);
         }
     }
+
+    @Override
+    public void disconnect() {
+        standardOutputReader.disconnect();
+        if (readErrorStream) {
+            standardErrorReader.disconnect();
+        }
+    }
 }
