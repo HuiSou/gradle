@@ -143,7 +143,7 @@ public class ForkingTestClassProcessor implements TestClassProcessor {
             if (remoteProcessor != null) {
                 lock.lock();
                 try {
-                    if (!stoppedNow && !Thread.currentThread().isInterrupted()) {
+                    if (!stoppedNow) {
                         remoteProcessor.stop();
                     }
                 } finally {

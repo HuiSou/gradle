@@ -261,7 +261,6 @@ public class DefaultExecHandle implements ExecHandle, ProcessSettings {
                     stateChanged.await();
                 } catch (InterruptedException e) {
                     execHandleRunner.abortProcess();
-                    Thread.currentThread().interrupt();
                     throw UncheckedException.throwAsUncheckedException(e);
                 }
             }
@@ -302,7 +301,6 @@ public class DefaultExecHandle implements ExecHandle, ProcessSettings {
                     stateChanged.await();
                 } catch (InterruptedException e) {
                     execHandleRunner.abortProcess();
-                    Thread.currentThread().interrupt();
                     throw UncheckedException.throwAsUncheckedException(e);
                 }
             }

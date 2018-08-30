@@ -26,7 +26,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 /**
- * A task executer that cancels the build and marks the task as failed if it exceeds its timeout.
+ * A task executer that interrupts a task if it exceeds its timeout.
  */
 public class TimeoutTaskExecuter implements TaskExecuter {
     private final TaskExecuter delegate;
