@@ -24,23 +24,14 @@ import java.util.concurrent.CountDownLatch;
 
 public class AbstractConditionalExecution<T> implements ConditionalExecution<T> {
     private final CountDownLatch finished = new CountDownLatch(1);
-    private final Runnable runnable;
+    private final InterruptibleRunnable runnable;
     private final ResourceLock resourceLock;
 
     private T result;
     private Throwable failure;
 
     public AbstractConditionalExecution(final Callable<T> callable, ResourceLock resourceLock) {
-        this.runnable = new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    result = callable.call();
-                } catch (Throwable t) {
-                    registerFailure(t);
-                }
-            }
-        };
+        this.runnable = new InterruptibleRunnable(callable);
         this.resourceLock = resourceLock;
     }
 
@@ -56,15 +47,23 @@ public class AbstractConditionalExecution<T> implements ConditionalExecution<T> 
 
     @Override
     public T await() {
-        try {
-            finished.await();
-            if (failure != null) {
-                throw UncheckedException.throwAsUncheckedException(failure);
-            } else {
-                return result;
+        boolean interrupted = false;
+        while(true) {
+            try {
+                finished.await();
+                break;
+            } catch(InterruptedException e) {
+                runnable.interrupt();
+                interrupted = true;
             }
-        } catch(InterruptedException e) {
-            throw UncheckedException.throwAsUncheckedException(e);
+        }
+        if (interrupted) {
+            Thread.currentThread().interrupt();
+        }
+        if (failure != null) {
+            throw UncheckedException.throwAsUncheckedException(failure);
+        } else {
+            return result;
         }
     }
 
@@ -81,5 +80,30 @@ public class AbstractConditionalExecution<T> implements ConditionalExecution<T> 
     @Override
     public void registerFailure(Throwable t) {
         this.failure = t;
+    }
+
+    private class InterruptibleRunnable implements Runnable {
+        private final Callable<T> callable;
+        private Thread thread;
+
+        public InterruptibleRunnable(Callable<T> callable) {
+            this.callable = callable;
+        }
+
+        @Override
+        public void run() {
+            thread = Thread.currentThread();
+            try {
+                result = callable.call();
+            } catch (Throwable t) {
+                registerFailure(t);
+            } finally {
+                Thread.interrupted();
+            }
+        }
+
+        public void interrupt() {
+            thread.interrupt();
+        }
     }
 }

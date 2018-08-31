@@ -17,10 +17,10 @@
 package org.gradle.api.tasks
 
 import org.gradle.integtests.fixtures.AbstractIntegrationSpec
-import spock.lang.Timeout
+import org.gradle.workers.IsolationMode
+import spock.lang.Unroll
 
 class TaskTimeoutIntegrationTest extends AbstractIntegrationSpec {
-    @Timeout(30)
     def "timeout stops long running method call"() {
         given:
         buildFile << """
@@ -37,7 +37,6 @@ class TaskTimeoutIntegrationTest extends AbstractIntegrationSpec {
         failure.assertHasDescription("task ':block' exceeded its timeout")
     }
 
-    @Timeout(30)
     def "other tasks still run after a timeout if --continue is used"() {
         given:
         buildFile << """
@@ -58,7 +57,6 @@ class TaskTimeoutIntegrationTest extends AbstractIntegrationSpec {
         failure.assertHasDescription("task ':block' exceeded its timeout")
     }
 
-    @Timeout(30)
     def "timeout stops long running exec()"() {
         given:
         file('src/main/java/Block.java') << """ 
@@ -84,7 +82,6 @@ class TaskTimeoutIntegrationTest extends AbstractIntegrationSpec {
         failure.assertHasDescription("task ':block' exceeded its timeout")
     }
 
-    @Timeout(30)
     def "timeout stops long running test"() {
         given:
         file('src/test/java/Block.java') << """ 
@@ -110,5 +107,65 @@ class TaskTimeoutIntegrationTest extends AbstractIntegrationSpec {
         expect:
         fails"test"
         failure.assertHasDescription("task ':test' exceeded its timeout")
+    }
+
+    @Unroll
+    def "timeout stops long running work item with #isolationMode isolation"() {
+        given:
+        file('src/test/java/Block.java') << """ 
+            import java.util.concurrent.CountDownLatch;
+            import org.junit.Test;
+
+            public class Block {
+                @Test
+                public void test() throws InterruptedException {
+                    new CountDownLatch(1).await();
+                }
+            }
+        """
+        buildFile << """
+            import java.util.concurrent.CountDownLatch;
+            import javax.inject.Inject;
+            
+            task block(type: WorkerTask) {
+                timeoutAfter 500, java.util.concurrent.TimeUnit.MILLISECONDS
+            }
+            
+            class WorkerTask extends DefaultTask {
+
+                @Inject
+                WorkerExecutor getWorkerExecutor() {
+                    throw new UnsupportedOperationException()
+                }
+
+                @TaskAction
+                void executeTask() {
+                    workerExecutor.submit(BlockingRunnable) {
+                        isolationMode = IsolationMode.$isolationMode
+                    }
+                }
+            }
+
+            public class BlockingRunnable implements Runnable {
+                @Inject
+                public BlockingRunnable() {
+                }
+
+                public void run() {
+                    try {
+                        new CountDownLatch(1).await();
+                    } catch (InterruptedException e ) {
+                        Thread.currentThread().interrupt();
+                    }
+                }
+            }
+            """
+
+        expect:
+        fails"block"
+        failure.assertHasDescription("task ':block' exceeded its timeout")
+
+        where:
+        isolationMode << IsolationMode.values()
     }
 }

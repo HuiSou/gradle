@@ -184,6 +184,7 @@ public class AsyncDispatch<T> implements Dispatch<T>, AsyncStoppable {
             try {
                 dispatchMessages(dispatch);
             } finally {
+                Thread.interrupted();
                 onDispatchThreadExit(this);
             }
         }
