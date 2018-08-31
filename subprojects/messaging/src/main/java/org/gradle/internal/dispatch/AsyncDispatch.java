@@ -18,11 +18,12 @@ package org.gradle.internal.dispatch;
 
 import org.gradle.internal.UncheckedException;
 import org.gradle.internal.concurrent.AsyncStoppable;
-import org.gradle.internal.concurrent.CompositeStoppable;
 import org.gradle.internal.operations.CurrentBuildOperationPreservingRunnable;
 
+import java.util.ArrayList;
 import java.util.LinkedList;
-import java.util.concurrent.ExecutorService;
+import java.util.List;
+import java.util.concurrent.Executor;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -41,16 +42,16 @@ public class AsyncDispatch<T> implements Dispatch<T>, AsyncStoppable {
     private final Lock lock = new ReentrantLock();
     private final Condition condition = lock.newCondition();
     private final LinkedList<T> queue = new LinkedList<T>();
-    private final ExecutorService executor;
+    private final Executor executor;
     private final int maxQueueSize;
-    private int dispatchers;
+    private final List<Dispatcher> dispatchers = new ArrayList<Dispatcher>();
     private State state;
 
-    public AsyncDispatch(ExecutorService executor) {
+    public AsyncDispatch(Executor executor) {
         this(executor, null, MAX_QUEUE_SIZE);
     }
 
-    public AsyncDispatch(ExecutorService executor, final Dispatch<? super T> dispatch, int maxQueueSize) {
+    public AsyncDispatch(Executor executor, final Dispatch<? super T> dispatch, int maxQueueSize) {
         this.executor = executor;
         this.maxQueueSize = maxQueueSize;
         state = State.Init;
@@ -63,36 +64,28 @@ public class AsyncDispatch<T> implements Dispatch<T>, AsyncStoppable {
      * Starts dispatching messages to the given handler. The handler does not need to be thread-safe.
      */
     public void dispatchTo(final Dispatch<? super T> dispatch) {
-        onDispatchThreadStart();
-        executor.execute(new CurrentBuildOperationPreservingRunnable(new Runnable() {
-            public void run() {
-                try {
-                    dispatchMessages(dispatch);
-                } finally {
-                    onDispatchThreadExit(dispatch);
-                }
-            }
-        }));
+        Dispatcher dispatcher = new Dispatcher(dispatch);
+        onDispatchThreadStart(dispatcher);
+        executor.execute(new CurrentBuildOperationPreservingRunnable(dispatcher));
     }
 
-    private void onDispatchThreadStart() {
+    private void onDispatchThreadStart(Dispatcher dispatcher) {
         lock.lock();
         try {
             if (state != State.Init) {
                 throw new IllegalStateException("This dispatch has been stopped.");
             }
-            dispatchers++;
+            dispatchers.add(dispatcher);
         } finally {
             lock.unlock();
         }
     }
 
-    private void onDispatchThreadExit(Dispatch<? super T> dispatch) {
+    private void onDispatchThreadExit(Dispatcher dispatcher) {
         lock.lock();
         try {
-            dispatchers--;
+            dispatchers.remove(dispatcher);
             condition.signalAll();
-            CompositeStoppable.stoppable(dispatch).stop();
         } finally {
             lock.unlock();
         }
@@ -103,44 +96,19 @@ public class AsyncDispatch<T> implements Dispatch<T>, AsyncStoppable {
         condition.signalAll();
     }
 
-    private void dispatchMessages(Dispatch<? super T> dispatch) {
-        while (true) {
-            T message = null;
-            lock.lock();
-            try {
-                while (state != State.Stopped && queue.isEmpty()) {
-                    try {
-                        condition.await();
-                    } catch (InterruptedException e) {
-                        throw UncheckedException.throwAsUncheckedException(e);
-                    }
-                }
-                if (!queue.isEmpty()) {
-                    message = queue.remove();
-                    condition.signalAll();
-                }
-            } finally {
-                lock.unlock();
-            }
-
-            if (message == null) {
-                // Have been stopped and nothing to deliver
-                return;
-            }
-
-            dispatch.dispatch(message);
-        }
-    }
-
     public void dispatch(final T message) {
         lock.lock();
         try {
+            boolean interrupted = false;
             while (state != State.Stopped && queue.size() >= maxQueueSize) {
                 try {
                     condition.await();
                 } catch (InterruptedException e) {
-                    throw UncheckedException.throwAsUncheckedException(e);
+                    interrupted = true;
                 }
+            }
+            if (interrupted) {
+                Thread.currentThread().interrupt();
             }
             if (state == State.Stopped) {
                 throw new IllegalStateException("Cannot dispatch message, as this message dispatch has been stopped. Message: " + message);
@@ -175,19 +143,88 @@ public class AsyncDispatch<T> implements Dispatch<T>, AsyncStoppable {
         lock.lock();
         try {
             setState(State.Stopped);
-            while (dispatchers > 0) {
-                condition.await();
-            }
-
-            if (!queue.isEmpty()) {
-                throw new IllegalStateException(
-                    "Cannot wait for messages to be dispatched, as there are no dispatch threads running.");
-            }
-        } catch (InterruptedException e) {
-            executor.shutdownNow();
-            throw UncheckedException.throwAsUncheckedException(e);
+            waitForAllMessages();
         } finally {
             lock.unlock();
+        }
+    }
+
+    private void waitForAllMessages() {
+        boolean interrupted = false;
+        while (!dispatchers.isEmpty()) {
+            try {
+                condition.await();
+            } catch (InterruptedException e) {
+                interrupted = true;
+                for (Dispatcher dispatcher : dispatchers) {
+                    dispatcher.interrupt();
+                }
+            }
+        }
+        if (interrupted) {
+            Thread.currentThread().interrupt();
+            throw UncheckedException.throwAsUncheckedException(new InterruptedException());
+        }
+        if (!queue.isEmpty()) {
+            throw new IllegalStateException(
+                "Cannot wait for messages to be dispatched, as there are no dispatch threads running.");
+        }
+    }
+
+    private class Dispatcher implements Runnable {
+        private final Dispatch<? super T> dispatch;
+        private Thread thread;
+
+        private Dispatcher(Dispatch<? super T> dispatch) {
+            this.dispatch = dispatch;
+        }
+
+        public void run() {
+            thread = Thread.currentThread();
+            try {
+                dispatchMessages(dispatch);
+            } finally {
+                onDispatchThreadExit(this);
+            }
+        }
+
+        public void interrupt() {
+            thread.interrupt();
+        }
+
+        private void dispatchMessages(Dispatch<? super T> dispatch) {
+            while (true) {
+                T message = waitForNextMessage();
+                if (message == null) {
+                    return;
+                }
+                dispatch.dispatch(message);
+            }
+        }
+
+        private T waitForNextMessage() {
+            lock.lock();
+            try {
+                boolean interrupted = false;
+                while (state != State.Stopped && queue.isEmpty()) {
+                    try {
+                        condition.await();
+                    } catch (InterruptedException e) {
+                        interrupted = true;
+                    }
+                }
+                if (interrupted) {
+                    Thread.currentThread().interrupt();
+                }
+                if (!queue.isEmpty()) {
+                    T message = queue.remove();
+                    condition.signalAll();
+                    return message;
+                }
+            } finally {
+                lock.unlock();
+            }
+            return null;
         }
     }
 }

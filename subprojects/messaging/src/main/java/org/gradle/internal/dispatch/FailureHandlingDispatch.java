@@ -15,10 +15,7 @@
  */
 package org.gradle.internal.dispatch;
 
-import org.gradle.internal.concurrent.CompositeStoppable;
-import org.gradle.internal.concurrent.Stoppable;
-
-public class FailureHandlingDispatch<T> implements Dispatch<T>, Stoppable {
+public class FailureHandlingDispatch<T> implements Dispatch<T> {
     private final Dispatch<? super T> dispatch;
     private final DispatchFailureHandler<? super T> handler;
 
@@ -33,10 +30,5 @@ public class FailureHandlingDispatch<T> implements Dispatch<T>, Stoppable {
         } catch (Throwable throwable) {
             handler.dispatchFailed(message, throwable);
         }
-    }
-
-    @Override
-    public void stop() {
-        CompositeStoppable.stoppable(dispatch).stop();
     }
 }
