@@ -21,6 +21,8 @@ import org.gradle.internal.resources.ResourceLock;
 
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class AbstractConditionalExecution<T> implements ConditionalExecution<T> {
     private final CountDownLatch finished = new CountDownLatch(1);
@@ -84,6 +86,8 @@ public class AbstractConditionalExecution<T> implements ConditionalExecution<T> 
 
     private class InterruptibleRunnable implements Runnable {
         private final Callable<T> callable;
+        private final Lock stateLock = new ReentrantLock();
+        private boolean interrupted;
         private Thread thread;
 
         public InterruptibleRunnable(Callable<T> callable) {
@@ -92,18 +96,51 @@ public class AbstractConditionalExecution<T> implements ConditionalExecution<T> 
 
         @Override
         public void run() {
-            thread = Thread.currentThread();
+
+            beforeRun();
             try {
                 result = callable.call();
             } catch (Throwable t) {
                 registerFailure(t);
             } finally {
+                afterRun();
+            }
+
+        }
+
+        private void beforeRun() {
+            stateLock.lock();
+            try {
+                thread = Thread.currentThread();
+                if (interrupted) {
+                    thread.interrupt();
+                }
+            } finally {
+                stateLock.unlock();
+            }
+        }
+
+        private void afterRun() {
+            stateLock.lock();
+            try {
                 Thread.interrupted();
+                thread = null;
+            } finally {
+                stateLock.unlock();
             }
         }
 
         public void interrupt() {
-            thread.interrupt();
+            stateLock.lock();
+            try {
+                if (thread == null) {
+                    interrupted = true;
+                } else {
+                    thread.interrupt();
+                }
+            } finally {
+                stateLock.unlock();
+            }
         }
     }
 }

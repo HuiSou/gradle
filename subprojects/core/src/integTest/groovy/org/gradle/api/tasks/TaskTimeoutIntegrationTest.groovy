@@ -23,30 +23,38 @@ import spock.lang.Unroll
 //TODO timeout only after task action has started (instead of guesswork with hardcoded timeouts)
 //TODO also test with very small timeout to ensure task execution infrastructure is timeout-safe
 class TaskTimeoutIntegrationTest extends AbstractIntegrationSpec {
-    def "timeout stops long running method call"() {
+
+    private static final List<Integer> TIMEOUTS = (0..100).collect { it * 5 }
+
+    @Unroll
+    def "timeout stops long running method call after #timeout ms"() {
         given:
         buildFile << """
             task block() {
                 doLast {
                     Thread.sleep(60000)
                 }
-                timeoutAfter 200, java.util.concurrent.TimeUnit.MILLISECONDS
+                timeoutAfter $timeout, java.util.concurrent.TimeUnit.MILLISECONDS
             }
             """
 
         expect:
         fails"block"
         failure.assertHasDescription("task ':block' exceeded its timeout")
+
+        where:
+        timeout << TIMEOUTS
     }
 
-    def "other tasks still run after a timeout if --continue is used"() {
+    @Unroll
+    def "other tasks still run after a timeout if --continue is used after #timeout ms"() {
         given:
         buildFile << """
             task block() {
                 doLast {
                     Thread.sleep(60000)
                 }
-                timeoutAfter 200, java.util.concurrent.TimeUnit.MILLISECONDS
+                timeoutAfter $timeout, java.util.concurrent.TimeUnit.MILLISECONDS
             }
             
             task foo() {
@@ -57,9 +65,13 @@ class TaskTimeoutIntegrationTest extends AbstractIntegrationSpec {
         fails"block", "foo", "--continue"
         result.assertTaskExecuted(":foo")
         failure.assertHasDescription("task ':block' exceeded its timeout")
+
+        where:
+        timeout << TIMEOUTS
     }
 
-    def "timeout stops long running exec()"() {
+    @Unroll
+    def "timeout stops long running exec() after #timeout ms"() {
         given:
         file('src/main/java/Block.java') << """ 
             import java.util.concurrent.CountDownLatch;
@@ -75,16 +87,20 @@ class TaskTimeoutIntegrationTest extends AbstractIntegrationSpec {
             task block(type: JavaExec) {
                 classpath = sourceSets.main.output
                 main = 'Block'
-                timeoutAfter 200, java.util.concurrent.TimeUnit.MILLISECONDS
+                timeoutAfter $timeout, java.util.concurrent.TimeUnit.MILLISECONDS
             }
             """
 
         expect:
         fails"block"
         failure.assertHasDescription("task ':block' exceeded its timeout")
+
+        where:
+        timeout << TIMEOUTS
     }
 
-    def "timeout stops long running test"() {
+    @Unroll
+    def "timeout stops long running test after #timeout ms"() {
         given:
         file('src/test/java/Block.java') << """ 
             import java.util.concurrent.CountDownLatch;
@@ -103,16 +119,19 @@ class TaskTimeoutIntegrationTest extends AbstractIntegrationSpec {
             dependencies {
                 testImplementation 'junit:junit:4.12'
             }
-            test.timeoutAfter 200, java.util.concurrent.TimeUnit.MILLISECONDS
+            test.timeoutAfter $timeout, java.util.concurrent.TimeUnit.MILLISECONDS
             """
 
         expect:
         fails"test"
         failure.assertHasDescription("task ':test' exceeded its timeout")
+
+        where:
+        timeout << TIMEOUTS
     }
 
     @Unroll
-    def "timeout stops long running work item with #isolationMode isolation"() {
+    def "timeout stops long running work item with #isolationMode isolation after #timeout ms"() {
         given:
         file('src/test/java/Block.java') << """ 
             import java.util.concurrent.CountDownLatch;
@@ -130,7 +149,7 @@ class TaskTimeoutIntegrationTest extends AbstractIntegrationSpec {
             import javax.inject.Inject;
             
             task block(type: WorkerTask) {
-                timeoutAfter 200, java.util.concurrent.TimeUnit.MILLISECONDS
+                timeoutAfter $timeout, java.util.concurrent.TimeUnit.MILLISECONDS
             }
             
             class WorkerTask extends DefaultTask {
@@ -168,6 +187,6 @@ class TaskTimeoutIntegrationTest extends AbstractIntegrationSpec {
         failure.assertHasDescription("task ':block' exceeded its timeout")
 
         where:
-        isolationMode << IsolationMode.values()
+        [isolationMode, timeout] << [IsolationMode.values(), TIMEOUTS].combinations()
     }
 }

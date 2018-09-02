@@ -40,7 +40,7 @@ public class TimeoutTaskExecuter implements TaskExecuter {
     @Override
     public void execute(TaskInternal task, TaskStateInternal state, TaskExecutionContext context) {
         CancelBuildOnTimeout cancelOnTimeout = new CancelBuildOnTimeout(task, Thread.currentThread());
-        ScheduledFuture<?> periodicCheck = executor.scheduleAtFixedRate(cancelOnTimeout, 0, 100, TimeUnit.MILLISECONDS);
+        ScheduledFuture<?> periodicCheck = executor.scheduleAtFixedRate(cancelOnTimeout, 0, 5, TimeUnit.MILLISECONDS);
         try {
             delegate.execute(task, state, context);
         } finally {
