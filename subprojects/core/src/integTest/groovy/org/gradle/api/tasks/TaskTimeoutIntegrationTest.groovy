@@ -20,6 +20,8 @@ import org.gradle.integtests.fixtures.AbstractIntegrationSpec
 import org.gradle.workers.IsolationMode
 import spock.lang.Unroll
 
+//TODO timeout only after task action has started (instead of guesswork with hardcoded timeouts)
+//TODO also test with very small timeout to ensure task execution infrastructure is timeout-safe
 class TaskTimeoutIntegrationTest extends AbstractIntegrationSpec {
     def "timeout stops long running method call"() {
         given:
@@ -128,7 +130,7 @@ class TaskTimeoutIntegrationTest extends AbstractIntegrationSpec {
             import javax.inject.Inject;
             
             task block(type: WorkerTask) {
-                timeoutAfter 500, java.util.concurrent.TimeUnit.MILLISECONDS
+                timeoutAfter 200, java.util.concurrent.TimeUnit.MILLISECONDS
             }
             
             class WorkerTask extends DefaultTask {
