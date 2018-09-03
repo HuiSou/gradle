@@ -73,15 +73,15 @@ public class InstallExecutable extends DefaultTask {
         ObjectFactory objectFactory = getProject().getObjects();
         this.workerLeaseService = workerLeaseService;
         this.libs = getProject().files();
-        this.installDirectory = newOutputDirectory();
-        this.installedExecutable = newOutputFile();
+        this.installDirectory = objectFactory.directoryProperty();
+        this.installedExecutable = objectFactory.fileProperty();
         this.installedExecutable.set(getLibDirectory().map(new Transformer<RegularFile, Directory>() {
             @Override
             public RegularFile transform(Directory directory) {
                 return directory.file(executable.getAsFile().get().getName());
             }
         }));
-        this.executable = newInputFile();
+        this.executable = objectFactory.fileProperty();
         this.targetPlatform = objectFactory.property(NativePlatform.class);
         this.toolChain = objectFactory.property(NativeToolChain.class);
     }
