@@ -87,13 +87,13 @@ assert System.getProperty('some-prop') == 'BBB'
         BuildEnvironment env
         GradleProject project
         withConnection {
-            env = it.model(BuildEnvironment.class).setJvmArguments('-Xmx200m', '-Xms100m').get()
+            env = it.model(BuildEnvironment.class).setJvmArguments('-Xmx200m', '-Xms100m', "-Dfoo=bar").get()
             project = it.model(GradleProject.class).setJvmArguments('-Xmx200m', '-Xms100m').get()
         }
 
         then:
         def inputArgsInBuild = project.description.split('##') as List
-        env.java.jvmArguments.each { inputArgsInBuild.contains(it) }
+        env.java.jvmArguments.each { println it; inputArgsInBuild.contains(it) }
     }
 
     @Issue("GRADLE-1799")
