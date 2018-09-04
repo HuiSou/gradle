@@ -60,6 +60,8 @@ public class InstallXCTestBundle extends DefaultTask {
         ObjectFactory objectFactory = getProject().getObjects();
         installDirectory = objectFactory.directoryProperty();
         bundleBinaryFile = objectFactory.fileProperty();
+        // A work around for not being able to skip the task when an input _file_ does not exist
+        dependsOn(bundleBinaryFile);
     }
 
     @Inject

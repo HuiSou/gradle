@@ -36,6 +36,7 @@ import org.gradle.api.tasks.Internal;
 import org.gradle.api.tasks.Nested;
 import org.gradle.api.tasks.Optional;
 import org.gradle.api.tasks.OutputDirectory;
+import org.gradle.api.tasks.OutputFile;
 import org.gradle.api.tasks.SkipWhenEmpty;
 import org.gradle.api.tasks.TaskAction;
 import org.gradle.internal.nativeintegration.filesystem.FileSystem;
@@ -82,6 +83,8 @@ public class InstallExecutable extends DefaultTask {
             }
         }));
         this.executable = objectFactory.fileProperty();
+        // A further work around for missing ability to skip task when input file is missing (see #getInputFileIfExists below)
+        dependsOn(executable);
         this.targetPlatform = objectFactory.property(NativePlatform.class);
         this.toolChain = objectFactory.property(NativeToolChain.class);
     }
@@ -132,7 +135,7 @@ public class InstallExecutable extends DefaultTask {
      *
      * @since 4.7
      */
-    @Internal
+    @OutputFile
     public RegularFileProperty getInstalledExecutable() {
         return installedExecutable;
     }
@@ -142,6 +145,7 @@ public class InstallExecutable extends DefaultTask {
      *
      * @since 4.3
      */
+    // TODO - allow @InputFile and @SkipWhenEmpty to be attached to getExecutableFile()
     @SkipWhenEmpty
     @Nullable
     @Optional
